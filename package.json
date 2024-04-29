@@ -1,0 +1,17 @@
+{
+  "name": "air-quality-dashboard",
+  "description": "A dashboard for visualizing data from air quality sensors.",
+  "scripts": {
+    "start": "esbuild ./main.ts --bundle --outfile=static/main.js --servedir=static --format=esm",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Viam Docs Team",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "*"
+  },
+  "dependencies": {
+    "@viamrobotics/sdk": "^0.13.0",
+    "bson": "^6.6.0"
+  }
+}

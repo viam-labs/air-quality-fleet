@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="main">
+      <div>
+        <h1>Air Quality Dashboard</h1>
+      </div>
+      <script type="module" src="main.js"></script>
+      <div>
+        <h2>PM 2.5 readings</h2>
+        <p>The following are averages of the last few readings from each machine:</p>
+      </div>
+      <div id="insert-readings">
+        <p><i>Loading data...
+          It may take a few moments for the data to load.
+          Do not refresh page.</i></p>
+      </div>
+      <br>
+      <div class="key">
+        <h4 style="margin:5px 0px">Key:</h4>
+        <p class="good">Good air quality</p>
+        <p class="moderate">Moderate</p>
+        <p class="unhealthy-sensitive">Unhealthy for sensitive groups</p>
+        <p class="unhealthy">Unhealthy</p>
+        <p class="very-unhealthy">Very unhealthy</p>
+        <p class="hazardous">Hazardous</p>
+      </div>
+      <p>
+        After the data has loaded, you can refresh the page for the latest readings.
+      </p>
+    </div>
+  </body>
+</html>

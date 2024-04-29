@@ -1,0 +1,66 @@
+body {
+  font-family: Helvetica;
+  margin-left: 20px;
+}
+
+div {
+  background-color: whitesmoke;
+}
+
+h1 {
+  color: black;
+}
+
+h2 {
+  font-family: Helvetica;
+}
+
+.inner-div {
+  font-family: monospace;
+  border: .2px solid;
+  background-color: lightblue;
+  padding: 20px;
+  margin-top: 10px;
+  max-width: 320px;
+  font-size: large;
+}
+
+.key {
+  max-width: 200px;
+  padding: 0px 5px 5px;
+}
+
+.key p {
+  padding: 4px;
+  margin: 0px;
+}
+
+.good {
+  background-color: lightgreen;
+}
+
+.moderate {
+  background-color: yellow;
+}
+
+.unhealthy-sensitive {
+  background-color: orange;
+}
+
+.unhealthy {
+  background-color: red;
+}
+
+.very-unhealthy {
+  background-color: violet;
+}
+
+.hazardous {
+  color: white;
+  background-color: purple;
+}
+
+#main {
+  max-width:600px;
+  padding:10px 30px 10px;
+}
