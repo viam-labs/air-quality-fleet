@@ -6,8 +6,8 @@ import Cookies from "js-cookie";
 
 let apiKeyId = "";
 let apiKeySecret = "";
+let host = "";
 let machineId = "";
-let hostname = "";
 
 async function main() {
 
@@ -147,11 +147,15 @@ async function getLastFewAv(all_measurements: any[], machineID: string) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  machineId = window.location.pathname.split("/")[2];
-  ({ id: apiKeyId, key: apiKeySecret, hostname: hostname } = JSON.parse(Cookies.get(machineId)!));
-
+  // Extract the machine identifier from the URL
+  let machineCookieKey = window.location.pathname.split("/")[2];
+  ({
+    apiKey: { id: apiKeyId, key: apiKeySecret },
+    machineId: machineId,
+    hostname: host,
+  } = JSON.parse(Cookies.get(machineCookieKey)!));
   main().catch((error) => {
     console.error("encountered an error:", error);
   });
-
+  console.log(apiKeyId, apiKeySecret, host, machineId);
 });
