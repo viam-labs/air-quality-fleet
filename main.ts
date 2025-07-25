@@ -2,25 +2,31 @@
 
 import * as VIAM from "@viamrobotics/sdk";
 import { BSON } from "bson";
+import Cookies from "js-cookie";
+
+let apiKeyId = "";
+let apiKeySecret = "";
+let host = "";
+let machineId = "";
 
 async function main() {
+
   const opts: VIAM.ViamClientOptions = {
-    credential: {
+    serviceHost: "https://app.viam.com",
+    credentials: {
       type: "api-key",
-      // Key with location operator permissions
-      // Replace <API-KEY> (including angle brackets)
-      payload: "<API-KEY>",
-      // Replace <API-KEY-ID> (including angle brackets)
-      authEntity: "<API-KEY-ID>",
+      payload: apiKeySecret,
+      authEntity: apiKeyId,
     },
   };
-
-  const orgID: string = "<ORGANIZATION ID>"; // Replace
-  const locationID: string = "<LOCATION ID>"; // Replace
 
   // Instantiate data_client and get all
   // data tagged with "air-quality" from your location
   const client = await VIAM.createViamClient(opts);
+  const machine = await client.appClient.getRobot(machineId);
+  const locationID = machine?.location;
+  const orgID = (await client.appClient.listOrganizations())[0].id;
+
   const myDataClient = client.dataClient;
   const query = {
     $match: {
@@ -41,7 +47,7 @@ async function main() {
   );
   // Get all the air quality data
   const BSONQueryForData = [BSON.serialize(query)];
-  let thedata: any = await myDataClient?.tabularDataByMQL(
+  let measurements: any = await myDataClient?.tabularDataByMQL(
     orgID,
     BSONQueryForData,
   );
@@ -51,9 +57,9 @@ async function main() {
   let htmlblock: HTMLElement = document.createElement("div");
 
   // Display the relevant data from each machine to the dashboard
-  for (const mach of machineIDs) {
+  for (let m of machineIDs) {
     let insideDiv: HTMLElement = document.createElement("div");
-    let avgPM: number = await getLastFewAv(thedata, mach._id);
+    let avgPM: number = await getLastFewAv(measurements, m._id);
     // Color-code the dashboard based on air quality category
     let level: string = "blue";
     switch (true) {
@@ -82,11 +88,12 @@ async function main() {
         break;
       }
     }
+    let machineName = (await client.appClient.getRobot(m._id))?.name;
     // Create the HTML output for this machine
     insideDiv.className = "inner-div " + level;
     insideDiv.innerHTML =
       "<p>" +
-      mach._id +
+      machineName +
       ": " +
       avgPM.toFixed(2).toString() +
       " &mu;g/m<sup>3</sup></p>";
@@ -94,16 +101,16 @@ async function main() {
   }
 
   // Output a block of HTML with color-coded boxes for each machine
-  return document.getElementById("insert-readings").replaceWith(htmlblock);
+  return document.getElementById("insert-readings")?.replaceWith(htmlblock);
 }
 
 // Get the average of the last five readings from a given sensor
-async function getLastFewAv(alltheData: any[], machineID: string) {
+async function getLastFewAv(all_measurements: any[], machineID: string) {
   // Get just the data from this machine
-  let thedata = new Array();
-  for (const entry of alltheData) {
+  let measurements = new Array();
+  for (const entry of all_measurements) {
     if (entry.robot_id == machineID) {
-      thedata.push({
+      measurements.push({
         PM25: entry.data.readings["pm_2.5"],
         time: entry.time_received,
       });
@@ -112,7 +119,7 @@ async function getLastFewAv(alltheData: any[], machineID: string) {
 
   // Sort the air quality data from this machine
   // by timestamp
-  thedata = thedata.sort(function (a, b) {
+  measurements = measurements.sort(function (a, b) {
     let x = a.time.toString();
     let y = b.time.toString();
     if (x < y) {
@@ -127,18 +134,28 @@ async function getLastFewAv(alltheData: any[], machineID: string) {
   // Add up the last 5 readings collected.
   // If there are fewer than 5 readings, add all of them.
   let x = 5; // The number of readings to average over
-  if (x > thedata.length) {
-    x = thedata.length;
+  if (x > measurements.length) {
+    x = measurements.length;
   }
   let total = 0;
   for (let i = 1; i <= x; i++) {
-    const reading: number = thedata[thedata.length - i].PM25;
+    const reading: number = measurements[measurements.length - i].PM25;
     total += reading;
   }
   // Return the average of the last few readings
   return total / x;
 }
 
-main().catch((error) => {
-  console.error("encountered an error:", error);
+document.addEventListener("DOMContentLoaded", async () => {
+  // Extract the machine identifier from the URL
+  let machineCookieKey = window.location.pathname.split("/")[2];
+  ({
+    apiKey: { id: apiKeyId, key: apiKeySecret },
+    machineId: machineId,
+    hostname: host,
+  } = JSON.parse(Cookies.get(machineCookieKey)!));
+  main().catch((error) => {
+    console.error("encountered an error:", error);
+  });
+  console.log(apiKeyId, apiKeySecret, host, machineId);
 });
