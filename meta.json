@@ -1,0 +1,21 @@
+{
+    "module_id": "naomi:air-quality",
+    "visibility": "public",
+    "url": "https://github.com/your-org/your-repo",
+    "description": "Display air quality data from a machine",
+    "applications": [
+      {
+        "name": "air-quality",
+        "type": "single_machine",
+        "entrypoint": "static/index.html",
+        "fragmentIds": [],
+        "logoPath": "static/logo.png",
+        "customizations": {
+          "machinePicker": {
+            "heading": "Air monitoring dashboard",
+            "subheading": "Sign in and select your devices to view your air quality metrics in a dashboard."
+          }
+        }
+      }
+    ]
+  }
