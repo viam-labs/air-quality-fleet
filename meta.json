@@ -1,14 +1,14 @@
 {
-    "module_id": "naomi:air-quality",
+    "module_id": "naomi:air-quality-multi-machine",
     "visibility": "public",
     "url": "https://github.com/your-org/your-repo",
-    "description": "Display air quality data from a machine",
+    "description": "Display air quality data from multiple machines",
     "applications": [
       {
-        "name": "air-quality",
-        "type": "single_machine",
+        "name": "air-quality-multi-machine",
+        "type": "multi_machine",
         "entrypoint": "static/index.html",
-        "fragmentIds": [],
+        "fragmentIds": [ "955d0869-65d2-4313-a7a0-966219656fdc" ],
         "logoPath": "static/logo.png",
         "customizations": {
           "machinePicker": {

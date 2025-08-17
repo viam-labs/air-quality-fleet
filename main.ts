@@ -4,158 +4,166 @@ import * as VIAM from "@viamrobotics/sdk";
 import { BSON } from "bson";
 import Cookies from "js-cookie";
 
-let apiKeyId = "";
-let apiKeySecret = "";
-let host = "";
-let machineId = "";
+let access_token = "";
+let fragmentID = "955d0869-65d2-4313-a7a0-966219656fdc";
 
 async function main() {
 
   const opts: VIAM.ViamClientOptions = {
     serviceHost: "https://app.viam.com",
     credentials: {
-      type: "api-key",
-      payload: apiKeySecret,
-      authEntity: apiKeyId,
+      type: "access-token",
+      payload: access_token,
     },
   };
 
   // Instantiate data_client and get all
   // data tagged with "air-quality" from your location
   const client = await VIAM.createViamClient(opts);
-  const machine = await client.appClient.getRobot(machineId);
-  const locationID = machine?.location;
-  const orgID = (await client.appClient.listOrganizations())[0].id;
+  const dataClient = client.dataClient;
+  const locationSummaries = await client.appClient.listMachineSummaries("", [fragmentID]);
+  console.log({fragmentID, locationSummaries})
 
-  const myDataClient = client.dataClient;
-  const query = {
-    $match: {
-      tags: "air-quality",
-      location_id: locationID,
-      organization_id: orgID,
-    },
-  };
-  const match = { $group: { _id: "$robot_id" } };
-  // Get a list of all the IDs of machines that have collected air quality data
-  const BSONQueryForMachineIDList = [
-    BSON.serialize(query),
-    BSON.serialize(match),
-  ];
-  let machineIDs: any = await myDataClient?.tabularDataByMQL(
-    orgID,
-    BSONQueryForMachineIDList,
-  );
-  // Get all the air quality data
-  const BSONQueryForData = [BSON.serialize(query)];
-  let measurements: any = await myDataClient?.tabularDataByMQL(
-    orgID,
-    BSONQueryForData,
-  );
+  let machineIDs: string[] = [];
+  let measurements: any[] = [];
 
-  // Instantiate the HTML block that will be returned
-  // once everything is appended to it
-  let htmlblock: HTMLElement = document.createElement("div");
+  // Get all the machine IDs from accessible machines that use the given fragment
+  for (let locationSummary of locationSummaries) {
+    let machines = locationSummary.machineSummaries;
+    for (let machine of machines) {
+      let machineID = machine.machineId;
+      let machineName = machine.machineName;
+      console.log({machineID, machineName});
+      machineIDs.push(machineID);
+    }
+  }
 
-  // Display the relevant data from each machine to the dashboard
-  for (let m of machineIDs) {
-    let insideDiv: HTMLElement = document.createElement("div");
-    let avgPM: number = await getLastFewAv(measurements, m._id);
-    // Color-code the dashboard based on air quality category
-    let level: string = "blue";
-    switch (true) {
-      case avgPM < 12.1: {
-        level = "good";
-        break;
-      }
-      case avgPM < 35.5: {
-        level = "moderate";
-        break;
-      }
-      case avgPM < 55.5: {
-        level = "unhealthy-sensitive";
-        break;
-      }
-      case avgPM < 150.5: {
-        level = "unhealthy";
-        break;
-      }
-      case avgPM < 250.5: {
-        level = "very-unhealthy";
-        break;
-      }
-      case avgPM >= 250.5: {
-        level = "hazardous";
-        break;
+  const orgs = await client.appClient.listOrganizations()
+  for (let machineID of machineIDs) {
+    const machine = await client.appClient.getRobot(machineID);
+    let locationID = machine?.location;
+    let orgID = "";
+
+    for (let org of orgs) {
+      let locations = await client.appClient.listLocations(org.id);
+      for (let location of locations) {
+        if (location.id === locationID) {
+          orgID = org.id;
+          break;
+        }
       }
     }
-    let machineName = (await client.appClient.getRobot(m._id))?.name;
-    // Create the HTML output for this machine
-    insideDiv.className = "inner-div " + level;
-    insideDiv.innerHTML =
-      "<p>" +
-      machineName +
-      ": " +
-      avgPM.toFixed(2).toString() +
-      " &mu;g/m<sup>3</sup></p>";
-    htmlblock.appendChild(insideDiv);
+
+    const match_query = {
+      $match: {
+        tags: "air-quality",
+        robot_id: machineID,
+        "component_name": "PM_sensor",
+        time_requested: { $gte: new Date(Date.now() - 1 * 60 * 60 * 1000) }  // Last 24 hours
+      }
+    }
+    const group_stage = {
+      $group: {
+        _id: null,
+        avg_pm_10: { $avg: "$data.readings.pm_10" },
+        avg_pm_2_5: { $avg: "$data.readings.pm_2.5" },
+        avg_pm_2_5_alt: { $avg: "$data.readings.pm_2_5" }
+      }
+    };
+
+    // Get the air quality data for the current machine
+    const BSONQueryForData = [BSON.serialize(match_query), BSON.serialize(group_stage)];
+    try {
+      let machineMeasurements: any = await dataClient?.tabularDataByMQL(
+        orgID,
+        BSONQueryForData,
+      );
+      console.log({machineID, machineMeasurements})
+      measurements[machineID] = machineMeasurements;
+    } catch (error) {
+      console.error(`Error getting data for machine ${machineID}:`, error);
+    }
+  }
+
+  let htmlblock: HTMLElement = document.createElement("div");
+
+  console.log({measurements})
+  // Display the relevant data from each machine to the dashboard
+  for (let m of machineIDs) {
+      let insideDiv: HTMLElement = document.createElement("div");
+      if (!measurements[m] || measurements[m].length === 0) {
+        console.log(`No measurements found for machine ${m}`);
+        let machineName = (await client.appClient.getRobot(m))?.name;
+        console.log({machineName})
+        // Create the HTML output for this machine
+        insideDiv.className = "inner-div " + "unavailable";
+        insideDiv.innerHTML =
+          "<p>" +
+          machineName +
+          ": No data";
+          htmlblock.appendChild(insideDiv);
+
+      } else {
+
+        console.log({measurements})
+        let avgPM: number = measurements[m][0].avg_pm_2_5_alt;
+        // Color-code the dashboard based on air quality category
+        let level: string = "blue";
+        switch (true) {
+          case avgPM < 12.1: {
+            level = "good";
+            break;
+          }
+          case avgPM < 35.5: {
+            level = "moderate";
+            break;
+          }
+          case avgPM < 55.5: {
+            level = "unhealthy-sensitive";
+            break;
+          }
+          case avgPM < 150.5: {
+            level = "unhealthy";
+            break;
+          }
+          case avgPM < 250.5: {
+            level = "very-unhealthy";
+            break;
+          }
+          case avgPM >= 250.5: {
+            level = "hazardous";
+            break;
+          }
+        }
+        console.log({m, avgPM, level})
+        let machineName = (await client.appClient.getRobot(m))?.name;
+        console.log({machineName})
+        // Create the HTML output for this machine
+        insideDiv.className = "inner-div " + level;
+        insideDiv.innerHTML =
+          "<p>" +
+          machineName +
+          ": " +
+          avgPM.toFixed(2).toString() +
+          " &mu;g/m<sup>3</sup></p>";
+          htmlblock.appendChild(insideDiv);
+      }
   }
 
   // Output a block of HTML with color-coded boxes for each machine
   return document.getElementById("insert-readings")?.replaceWith(htmlblock);
 }
 
-// Get the average of the last five readings from a given sensor
-async function getLastFewAv(all_measurements: any[], machineID: string) {
-  // Get just the data from this machine
-  let measurements = new Array();
-  for (const entry of all_measurements) {
-    if (entry.robot_id == machineID) {
-      measurements.push({
-        PM25: entry.data.readings["pm_2.5"],
-        time: entry.time_received,
-      });
-    }
-  }
-
-  // Sort the air quality data from this machine
-  // by timestamp
-  measurements = measurements.sort(function (a, b) {
-    let x = a.time.toString();
-    let y = b.time.toString();
-    if (x < y) {
-      return -1;
-    }
-    if (x > y) {
-      return 1;
-    }
-    return 0;
-  });
-
-  // Add up the last 5 readings collected.
-  // If there are fewer than 5 readings, add all of them.
-  let x = 5; // The number of readings to average over
-  if (x > measurements.length) {
-    x = measurements.length;
-  }
-  let total = 0;
-  for (let i = 1; i <= x; i++) {
-    const reading: number = measurements[measurements.length - i].PM25;
-    total += reading;
-  }
-  // Return the average of the last few readings
-  return total / x;
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
-  // Extract the machine identifier from the URL
-  let machineCookieKey = window.location.pathname.split("/")[2];
-  ({
-    apiKey: { id: apiKeyId, key: apiKeySecret },
-    machineId: machineId,
-    hostname: host,
-  } = JSON.parse(Cookies.get(machineCookieKey)!));
+
+  const userTokenRawCookie = Cookies.get("userToken")!;
+  const startIndex = userTokenRawCookie.indexOf("{");
+  const endIndex = userTokenRawCookie.indexOf("}");
+  const userTokenValue = userTokenRawCookie.slice(startIndex, endIndex+1);
+  const {access_token: accessToken} = JSON.parse(userTokenValue);
+  access_token = accessToken;
+
   main().catch((error) => {
     console.error("encountered an error:", error);
   });
-  console.log(apiKeyId, apiKeySecret, host, machineId);
 });
