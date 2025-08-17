@@ -22,9 +22,9 @@ async function main() {
   const client = await VIAM.createViamClient(opts);
   const dataClient = client.dataClient;
   const locationSummaries = await client.appClient.listMachineSummaries("", [fragmentID]);
-  console.log({fragmentID, locationSummaries})
 
   let machineIDs: string[] = [];
+  let machineNames: string[] = [];
   let measurements: any[] = [];
 
   // Get all the machine IDs from accessible machines that use the given fragment
@@ -32,8 +32,7 @@ async function main() {
     let machines = locationSummary.machineSummaries;
     for (let machine of machines) {
       let machineID = machine.machineId;
-      let machineName = machine.machineName;
-      console.log({machineID, machineName});
+      machineNames[machineID] = machine.machineName;
       machineIDs.push(machineID);
     }
   }
@@ -78,7 +77,6 @@ async function main() {
         orgID,
         BSONQueryForData,
       );
-      console.log({machineID, machineMeasurements})
       measurements[machineID] = machineMeasurements;
     } catch (error) {
       console.error(`Error getting data for machine ${machineID}:`, error);
@@ -87,14 +85,13 @@ async function main() {
 
   let htmlblock: HTMLElement = document.createElement("div");
 
-  console.log({measurements})
   // Display the relevant data from each machine to the dashboard
   for (let m of machineIDs) {
       let insideDiv: HTMLElement = document.createElement("div");
+      let machineName = machineNames[m];
+
       if (!measurements[m] || measurements[m].length === 0) {
         console.log(`No measurements found for machine ${m}`);
-        let machineName = (await client.appClient.getRobot(m))?.name;
-        console.log({machineName})
         // Create the HTML output for this machine
         insideDiv.className = "inner-div " + "unavailable";
         insideDiv.innerHTML =
@@ -104,11 +101,9 @@ async function main() {
           htmlblock.appendChild(insideDiv);
 
       } else {
-
-        console.log({measurements})
         let avgPM: number = measurements[m][0].avg_pm_2_5_alt;
         // Color-code the dashboard based on air quality category
-        let level: string = "blue";
+        let level: string = "lightgray";
         switch (true) {
           case avgPM < 12.1: {
             level = "good";
@@ -135,9 +130,6 @@ async function main() {
             break;
           }
         }
-        console.log({m, avgPM, level})
-        let machineName = (await client.appClient.getRobot(m))?.name;
-        console.log({machineName})
         // Create the HTML output for this machine
         insideDiv.className = "inner-div " + level;
         insideDiv.innerHTML =
@@ -160,8 +152,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const startIndex = userTokenRawCookie.indexOf("{");
   const endIndex = userTokenRawCookie.indexOf("}");
   const userTokenValue = userTokenRawCookie.slice(startIndex, endIndex+1);
-  const {access_token: accessToken} = JSON.parse(userTokenValue);
-  access_token = accessToken;
+  access_token = JSON.parse(userTokenValue).access_token;
 
   main().catch((error) => {
     console.error("encountered an error:", error);
