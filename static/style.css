@@ -1,6 +1,10 @@
 body {
   font-family: Helvetica;
-  margin-left: 20px;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 div {
@@ -9,30 +13,51 @@ div {
 
 h1 {
   color: black;
+  margin: 0 0 20px 0;
 }
 
 h2 {
   font-family: Helvetica;
+  margin: 0 0 15px 0;
 }
 
 .inner-div {
   font-family: monospace;
   border: .2px solid;
-  background-color: lightblue;
+  background-color: lightgray;
   padding: 20px;
   margin-top: 10px;
-  max-width: 320px;
+  width: 100%;
+  max-width: none;
   font-size: large;
+  box-sizing: border-box;
 }
 
 .key {
-  max-width: 200px;
-  padding: 0px 5px 5px;
+  max-width: none;
+  width: 100%;
+  padding: 10px 0px;
+  box-sizing: border-box;
+  margin-top: auto;
+  border-top: 1px solid #ccc;
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .key p {
-  padding: 4px;
-  margin: 0px;
+  padding: 5px;
+  font-size: 0.9em;
+  max-width: 210px;
+  margin: 5px 0px;
+}
+
+.key p.title {
+  margin-right: 10px;
+}
+
+.refresh-note {
+  margin: 0.25em;
+  font-size: 0.9em;
 }
 
 .good {
@@ -60,7 +85,66 @@ h2 {
   background-color: purple;
 }
 
+.unavailable {
+  background-color: lightgray;
+}
+
 #main {
-  max-width:600px;
-  padding:10px 30px 10px;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  #main {
+    padding: 15px;
+  }
+
+  .inner-div {
+    padding: 15px;
+    font-size: medium;
+  }
+
+  h1 {
+    font-size: 1.5em;
+  }
+
+  h2 {
+    font-size: 1.3em;
+  }
+}
+
+.spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+}
+
+.spinner {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px auto;
+}
+
+.spinner-container p {
+  margin: 0;
+  max-width: 400px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
