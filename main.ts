@@ -5,7 +5,8 @@ import { BSON } from "bson";
 import Cookies from "js-cookie";
 
 let access_token = "";
-let fragmentID = "955d0869-65d2-4313-a7a0-966219656fdc";
+let fragmentID = "";
+let location_id = "";
 
 async function main() {
 
@@ -21,77 +22,73 @@ async function main() {
   // data tagged with "air-quality" from your location
   const client = await VIAM.createViamClient(opts);
   const dataClient = client.dataClient;
-  const locationSummaries = await client.appClient.listMachineSummaries("", [fragmentID]);
+  let locationSummaries: any[] = [];
+  if (fragmentID !== "") {
+    locationSummaries = await client.appClient.listMachineSummaries("", [fragmentID]);
+  } else if (location_id !== "") {
+    locationSummaries = await client.appClient.listMachineSummaries("", [], [location_id]);
+  } else {
+    locationSummaries = await client.appClient.listMachineSummaries("");
+  }
 
-  let machineIDs: string[] = [];
-  let machineNames: string[] = [];
   let measurements: any[] = [];
+  let htmlblock: HTMLElement = document.createElement("div");
+  let location_orgID_mapping: any[] = [];
 
-  // Get all the machine IDs from accessible machines that use the given fragment
+  // Get all the machine IDs from accessible machines
   for (let locationSummary of locationSummaries) {
+    console.log(locationSummary);
     let machines = locationSummary.machineSummaries;
     for (let machine of machines) {
       let machineID = machine.machineId;
-      machineNames[machineID] = machine.machineName;
-      machineIDs.push(machineID);
-    }
-  }
+      let machineName = machine.machineName;
+      let orgID = "";
 
-  const orgs = await client.appClient.listOrganizations()
-  for (let machineID of machineIDs) {
-    const machine = await client.appClient.getRobot(machineID);
-    let locationID = machine?.location;
-    let orgID = "";
+      if (location_orgID_mapping.includes(locationSummary.locationId)) {
+        orgID = location_orgID_mapping[locationSummary.locationId];
+      } else {
+        // Get the full location details to access organizationId
+        let locationDetails = await client.appClient.getLocation(locationSummary.locationId);
+        orgID = locationDetails?.organizations[0].organizationId || "";
 
-    for (let org of orgs) {
-      let locations = await client.appClient.listLocations(org.id);
-      for (let location of locations) {
-        if (location.id === locationID) {
-          orgID = org.id;
-          break;
+        location_orgID_mapping[locationSummary.locationId] = orgID;
+      }
+
+      console.log({machineID, machineName, orgID});
+
+      const match_query = {
+        $match: {
+          tags: "air-quality",
+          robot_id: machineID,
+          "component_name": "PM_sensor",
+          time_requested: { $gte: new Date(Date.now() - 1 * 60 * 60 * 1000) }  // Last 24 hours
         }
       }
-    }
+      const group_stage = {
+        $group: {
+          _id: null,
+          avg_pm_10: { $avg: "$data.readings.pm_10" },
+          avg_pm_2_5: { $avg: "$data.readings.pm_2.5" },
+          avg_pm_2_5_alt: { $avg: "$data.readings.pm_2_5" }
+        }
+      };
 
-    const match_query = {
-      $match: {
-        tags: "air-quality",
-        robot_id: machineID,
-        "component_name": "PM_sensor",
-        time_requested: { $gte: new Date(Date.now() - 1 * 60 * 60 * 1000) }  // Last 24 hours
+      // Get the air quality data for the current machine
+      const BSONQueryForData = [BSON.serialize(match_query), BSON.serialize(group_stage)];
+      try {
+        let machineMeasurements: any = await dataClient?.tabularDataByMQL(
+          orgID,
+          BSONQueryForData,
+        );
+        measurements[machineID] = machineMeasurements;
+      } catch (error) {
+        console.error(`Error getting data for machine ${machineID}:`, error);
       }
-    }
-    const group_stage = {
-      $group: {
-        _id: null,
-        avg_pm_10: { $avg: "$data.readings.pm_10" },
-        avg_pm_2_5: { $avg: "$data.readings.pm_2.5" },
-        avg_pm_2_5_alt: { $avg: "$data.readings.pm_2_5" }
-      }
-    };
 
-    // Get the air quality data for the current machine
-    const BSONQueryForData = [BSON.serialize(match_query), BSON.serialize(group_stage)];
-    try {
-      let machineMeasurements: any = await dataClient?.tabularDataByMQL(
-        orgID,
-        BSONQueryForData,
-      );
-      measurements[machineID] = machineMeasurements;
-    } catch (error) {
-      console.error(`Error getting data for machine ${machineID}:`, error);
-    }
-  }
-
-  let htmlblock: HTMLElement = document.createElement("div");
-
-  // Display the relevant data from each machine to the dashboard
-  for (let m of machineIDs) {
       let insideDiv: HTMLElement = document.createElement("div");
-      let machineName = machineNames[m];
 
-      if (!measurements[m] || measurements[m].length === 0) {
-        console.log(`No measurements found for machine ${m}`);
+      if (!measurements[machineID] || measurements[machineID].length === 0) {
+        console.log(`No measurements found for machine ${machineID}`);
         // Create the HTML output for this machine
         insideDiv.className = "inner-div " + "unavailable";
         insideDiv.innerHTML =
@@ -101,7 +98,7 @@ async function main() {
           htmlblock.appendChild(insideDiv);
 
       } else {
-        let avgPM: number = measurements[m][0].avg_pm_2_5_alt;
+        let avgPM: number = measurements[machineID][0].avg_pm_2_5_alt;
         // Color-code the dashboard based on air quality category
         let level: string = "lightgray";
         switch (true) {
@@ -139,11 +136,14 @@ async function main() {
           avgPM.toFixed(2).toString() +
           " &mu;g/m<sup>3</sup></p>";
           htmlblock.appendChild(insideDiv);
-      }
+        }
+
+        // Add the block of HTML with color-coded boxes for each machine
+        document.getElementById("insert-readings")?.replaceWith(htmlblock);
+    }
   }
 
-  // Output a block of HTML with color-coded boxes for each machine
-  return document.getElementById("insert-readings")?.replaceWith(htmlblock);
+  return;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
