@@ -7,15 +7,7 @@
       {
         "name": "air-quality-multi-machine",
         "type": "multi_machine",
-        "entrypoint": "static/index.html",
-        "fragmentIds": [  ],
-        "logoPath": "static/logo.png",
-        "customizations": {
-          "machinePicker": {
-            "heading": "Air monitoring dashboard",
-            "subheading": "Sign in and select your devices to view your air quality metrics in a dashboard."
-          }
-        }
+        "entrypoint": "static/index.html"
       }
     ]
   }
