@@ -9,7 +9,6 @@ let fragmentID = "";
 let location_id = "";
 
 async function main() {
-
   const opts: VIAM.ViamClientOptions = {
     serviceHost: "https://app.viam.com",
     credentials: {
@@ -24,9 +23,15 @@ async function main() {
   const dataClient = client.dataClient;
   let locationSummaries: any[] = [];
   if (fragmentID !== "") {
-    locationSummaries = await client.appClient.listMachineSummaries("", [fragmentID]);
+    locationSummaries = await client.appClient.listMachineSummaries("", [
+      fragmentID,
+    ]);
   } else if (location_id !== "") {
-    locationSummaries = await client.appClient.listMachineSummaries("", [], [location_id]);
+    locationSummaries = await client.appClient.listMachineSummaries(
+      "",
+      [],
+      [location_id],
+    );
   } else {
     locationSummaries = await client.appClient.listMachineSummaries("");
   }
@@ -48,33 +53,38 @@ async function main() {
         orgID = location_orgID_mapping[locationSummary.locationId];
       } else {
         // Get the full location details to access organizationId
-        let locationDetails = await client.appClient.getLocation(locationSummary.locationId);
+        let locationDetails = await client.appClient.getLocation(
+          locationSummary.locationId,
+        );
         orgID = locationDetails?.organizations[0].organizationId || "";
 
         location_orgID_mapping[locationSummary.locationId] = orgID;
       }
 
-      console.log({machineID, machineName, orgID});
+      console.log({ machineID, machineName, orgID });
 
       const match_query = {
         $match: {
           tags: "air-quality",
           robot_id: machineID,
-          "component_name": "PM_sensor",
-          time_requested: { $gte: new Date(Date.now() - 1 * 60 * 60 * 1000) }  // Last 24 hours
-        }
-      }
+          component_name: "PM_sensor",
+          time_requested: { $gte: new Date(Date.now() - 1 * 60 * 60 * 1000) }, // Last 24 hours
+        },
+      };
       const group_stage = {
         $group: {
           _id: null,
           avg_pm_10: { $avg: "$data.readings.pm_10" },
           avg_pm_2_5: { $avg: "$data.readings.pm_2.5" },
-          avg_pm_2_5_alt: { $avg: "$data.readings.pm_2_5" }
-        }
+          avg_pm_2_5_alt: { $avg: "$data.readings.pm_2_5" },
+        },
       };
 
       // Get the air quality data for the current machine
-      const BSONQueryForData = [BSON.serialize(match_query), BSON.serialize(group_stage)];
+      const BSONQueryForData = [
+        BSON.serialize(match_query),
+        BSON.serialize(group_stage),
+      ];
       try {
         let machineMeasurements: any = await dataClient?.tabularDataByMQL(
           orgID,
@@ -91,12 +101,8 @@ async function main() {
         console.log(`No measurements found for machine ${machineID}`);
         // Create the HTML output for this machine
         insideDiv.className = "inner-div " + "unavailable";
-        insideDiv.innerHTML =
-          "<p>" +
-          machineName +
-          ": No data";
-          htmlblock.appendChild(insideDiv);
-
+        insideDiv.innerHTML = "<p>" + machineName + ": No data";
+        htmlblock.appendChild(insideDiv);
       } else {
         let avgPM: number = measurements[machineID][0].avg_pm_2_5_alt;
         // Color-code the dashboard based on air quality category
@@ -135,11 +141,11 @@ async function main() {
           ": " +
           avgPM.toFixed(2).toString() +
           " &mu;g/m<sup>3</sup></p>";
-          htmlblock.appendChild(insideDiv);
-        }
+        htmlblock.appendChild(insideDiv);
+      }
 
-        // Add the block of HTML with color-coded boxes for each machine
-        document.getElementById("insert-readings")?.replaceWith(htmlblock);
+      // Add the block of HTML with color-coded boxes for each machine
+      document.getElementById("insert-readings")?.replaceWith(htmlblock);
     }
   }
 
@@ -147,11 +153,10 @@ async function main() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-
   const userTokenRawCookie = Cookies.get("userToken")!;
   const startIndex = userTokenRawCookie.indexOf("{");
   const endIndex = userTokenRawCookie.indexOf("}");
-  const userTokenValue = userTokenRawCookie.slice(startIndex, endIndex+1);
+  const userTokenValue = userTokenRawCookie.slice(startIndex, endIndex + 1);
   access_token = JSON.parse(userTokenValue).access_token;
 
   main().catch((error) => {
